@@ -5,11 +5,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#dc2626">
+    
+    <!-- Configuración para App Instalada -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Commagra">
     <meta name="mobile-web-app-capable" content="yes">
-    <link rel="manifest" href="manifest.json">
+    
+    <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/4342/4342728.png">
+    
     <title>Commagra - Gestión de Taller</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -20,12 +25,14 @@
             -webkit-tap-highlight-color: transparent;
             overscroll-behavior-y: none;
             background-color: #f9fafb;
+            margin: 0;
+            padding: 0;
         }
-        /* Corregir margen superior en iPhones con Notch */
-        header {
+        /* Ajuste para Notch de iPhone */
+        #root {
             padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
         }
-        /* Animaciones suaves */
         .animate-in {
             animation: fadeIn 0.3s ease-out;
         }
@@ -51,3 +58,4 @@
 <script type="module" src="/index.tsx"></script>
 </body>
 </html>
+
