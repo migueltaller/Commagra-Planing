@@ -15,6 +15,7 @@ const App: React.FC = () => {
   const [tasks, setTasks] = useState<MarbleTask[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [filter, setFilter] = useState<TaskStatus | 'TODAS'>('TODAS');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
   const [settings, setSettings] = useState<AppSettings>({
@@ -58,6 +59,33 @@ const App: React.FC = () => {
     window.open(url, '_blank');
   };
 
+  // Función para traer datos de la nube
+  const pullFromCloud = async () => {
+    if (!settings.googleSheetWebhookUrl) {
+      alert("Configura la URL de Google Sheets primero.");
+      return;
+    }
+
+    setIsSyncing(true);
+    try {
+      // Para leer datos de Google Sheets necesitamos enviar una petición que el script entienda
+      // Nota: El script de Google Apps debe devolver JSON
+      const response = await fetch(`${settings.googleSheetWebhookUrl}?action=read`);
+      const cloudTasks = await response.json();
+      
+      if (Array.isArray(cloudTasks)) {
+        // Combinamos manteniendo los IDs únicos, priorizando lo que viene de la nube
+        setTasks(cloudTasks.map(t => ({ ...t, syncedToSheet: true })));
+        alert("¡Datos actualizados desde la nube!");
+      }
+    } catch (error) {
+      console.error('Error al sincronizar:', error);
+      alert("No se pudieron traer los datos. Asegúrate de que el Script de Google permite lecturas (GET).");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const syncToGoogleSheet = async (task: any, action: 'add' | 'update' | 'test') => {
     if (!settings.googleSheetEnabled && action !== 'test') return false;
     
@@ -72,7 +100,9 @@ const App: React.FC = () => {
       material: task.material || '-',
       estado: task.status || task.estado || 'PENDIENTE',
       descripcion: task.description || task.descripcion || 'Prueba',
-      fecha: new Date().toLocaleString('es-ES'),
+      fecha: task.fecha || new Date().toISOString().split('T')[0],
+      pedido: task.pedido || '',
+      color: task.color || ''
     };
 
     try {
@@ -113,7 +143,6 @@ const App: React.FC = () => {
           const updatedTask = { ...t, status: newStatus, syncedToSheet: false };
           syncToGoogleSheet(updatedTask, 'update');
           
-          // Preguntar antes de enviar WhatsApp para no saturar
           if (confirm(`¿Enviar notificación de WhatsApp para ${updatedTask.clientName}?`)) {
             sendWhatsAppMessage(updatedTask, newStatus);
           }
@@ -158,8 +187,16 @@ const App: React.FC = () => {
 
           <div className="flex gap-4 w-full md:w-auto">
              <button
+              onClick={pullFromCloud}
+              disabled={isSyncing}
+              className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-lg ${isSyncing ? 'bg-gray-100 text-gray-400' : 'bg-green-600 text-white hover:bg-black active:scale-95'}`}
+              title="Sincronizar con la Nube"
+            >
+              <i className={`fas fa-sync-alt ${isSyncing ? 'fa-spin' : ''}`}></i>
+            </button>
+             <button
               onClick={() => setViewMode(viewMode === 'table' ? 'cards' : 'table')}
-              className="bg-gray-100 text-gray-600 w-14 h-14 rounded-2xl flex items-center justify-center hover:bg-gray-200 transition-all"
+              className="bg-gray-100 text-gray-600 w-14 h-14 rounded-2xl flex items-center justify-center hover:bg-gray-200 transition-all shadow-sm"
             >
               <i className={`fas ${viewMode === 'table' ? 'fa-th-large' : 'fa-list'}`}></i>
             </button>
@@ -172,6 +209,13 @@ const App: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {isSyncing && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-2xl flex items-center justify-center gap-3 animate-pulse">
+            <i className="fas fa-cloud-download-alt text-green-600"></i>
+            <span className="text-[10px] font-black text-green-700 uppercase tracking-widest">Sincronizando datos de Commagra...</span>
+          </div>
+        )}
 
         <TaskList 
           tasks={filter === 'TODAS' ? tasks : tasks.filter(t => t.status === filter)} 
