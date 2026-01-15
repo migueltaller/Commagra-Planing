@@ -5,7 +5,6 @@ import Header from './components/Header';
 import TaskForm from './components/TaskForm';
 import TaskList from './components/TaskList';
 import DashboardStats from './components/DashboardStats';
-import GeminiAssistant from './components/GeminiAssistant';
 import SettingsModal from './components/SettingsModal';
 
 const STORAGE_KEY = 'commagra_tasks_v1';
@@ -49,7 +48,8 @@ const App: React.FC = () => {
       `*Estado:* ${newStatus.toUpperCase()} 🚨%0A` +
       `*Cliente:* ${task.clientName}%0A` +
       `*Material:* ${task.material} (${task.color})%0A` +
-      `*Operario:* ${task.montador}%0A` +
+      `*Montadores:* ${task.montador}%0A` +
+      `*Entrega:* ${task.deliveryDate}%0A` +
       `*Pedido:* ${task.pedido || 'S/N'}%0A%0A` +
       `_Mensaje enviado desde la App Interna Commagra_`;
     const phone = settings.whatsappNumber.replace(/\D/g, '');
@@ -74,36 +74,37 @@ const App: React.FC = () => {
       
       if (Array.isArray(cloudTasks)) {
         if (cloudTasks.length === 0) {
-          alert("El Excel está vacío. No hay tareas para cargar.");
+          alert("El Excel está vacío.");
           setIsSyncing(false);
           return;
         }
 
         const mappedTasks: MarbleTask[] = cloudTasks.map((t: any) => ({
-          id: String(t.id || Math.random().toString(36).substr(2, 6).toUpperCase()),
-          montador: String(t.montador || 'TALLER'),
-          clientName: String(t.clientName || t.cliente || 'Sin Cliente'),
-          material: String(t.material || '-'),
+          id: String(t.id),
+          montador: String(t.montador),
+          clientName: String(t.clientName),
+          material: String(t.material),
           color: String(t.color || ''),
-          status: (t.status || t.estado || TaskStatus.PENDIENTE) as TaskStatus,
-          description: String(t.description || t.descripcion || ''),
+          status: (t.status) as TaskStatus,
+          description: String(t.description),
           pedido: String(t.pedido || ''),
-          fecha: String(t.fecha || new Date().toISOString().split('T')[0]),
+          fecha: String(t.fecha),
+          deliveryDate: String(t.deliveryDate || ''),
           hora: String(t.hora || ''),
-          fileName: String(t.fileName || t.archivoNombre || ''),
-          fileData: String(t.fileData || t.archivoDatos || ''),
+          fileName: String(t.fileName || ''),
+          fileData: String(t.fileData || ''),
+          dxfFileName: String(t.dxfFileName || ''),
+          dxfFileData: String(t.dxfFileData || ''),
           syncedToSheet: true,
           createdAt: Number(t.createdAt || Date.now())
         }));
         
         setTasks(mappedTasks);
-        alert(`¡Sincronización completa!\nSe han cargado ${mappedTasks.length} trabajos con sus planos.`);
-      } else {
-        throw new Error("Formato de datos inválido.");
+        alert(`Sincronización completa: ${mappedTasks.length} trabajos cargados.`);
       }
     } catch (error) {
-      console.error('Error detallado:', error);
-      alert("ERROR DE SINCRONIZACIÓN. Posibles causas:\n1. El PDF es demasiado grande para Google Sheets.\n2. Script no actualizado.\n3. URL incorrecta.");
+      console.error(error);
+      alert("Error al cargar datos de la nube.");
     } finally {
       setIsSyncing(false);
     }
@@ -116,18 +117,19 @@ const App: React.FC = () => {
 
     const payload = {
       action,
-      id: task.id || 'TEST-' + Date.now(),
-      montador: task.montador || 'SISTEMA',
-      cliente: task.clientName || 'PRUEBA',
-      material: task.material || '-',
-      estado: task.status || 'PENDIENTE',
-      descripcion: task.description || 'Prueba',
-      fecha: task.fecha || new Date().toISOString().split('T')[0],
-      pedido: task.pedido || '',
-      color: task.color || '',
-      archivoNombre: task.fileName || '',
-      archivoDatos: task.fileData || '', // Enviamos el PDF en base64
-      createdAt: task.createdAt || Date.now()
+      id: task.id,
+      montadores: task.montador,
+      cliente: task.clientName,
+      material: task.material,
+      estado: task.status,
+      descripcion: task.description,
+      fecha: task.fecha,
+      fechaEntrega: task.deliveryDate,
+      pedido: task.pedido,
+      color: task.color,
+      archivoPDF: task.fileData || '',
+      archivoDXF: task.dxfFileData || '',
+      createdAt: task.createdAt
     };
 
     try {
@@ -143,7 +145,6 @@ const App: React.FC = () => {
       }
       return true;
     } catch (error) {
-      console.error('Sync error:', error);
       return false;
     }
   };
@@ -166,7 +167,7 @@ const App: React.FC = () => {
         if (t.id === id) {
           const updatedTask = { ...t, status: newStatus, syncedToSheet: false };
           syncToGoogleSheet(updatedTask, 'update');
-          if (confirm(`¿Enviar notificación de cambio a WhatsApp?`)) {
+          if (confirm(`¿Notificar cambio a WhatsApp?`)) {
             sendWhatsAppMessage(updatedTask, newStatus);
           }
           return updatedTask;
@@ -178,7 +179,7 @@ const App: React.FC = () => {
   };
 
   const deleteTask = (id: string) => {
-    if (window.confirm('¿Eliminar este trabajo del sistema?')) {
+    if (window.confirm('¿Eliminar este trabajo?')) {
       setTasks(prev => prev.filter(t => t.id !== id));
     }
   };
@@ -212,7 +213,7 @@ const App: React.FC = () => {
               onClick={pullFromCloud}
               disabled={isSyncing}
               className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center transition-all shadow-lg ${isSyncing ? 'bg-gray-100 text-gray-400' : 'bg-green-600 text-white hover:bg-black active:scale-95'}`}
-              title="Descargar de la nube"
+              title="Sincronizar de la Nube"
             >
               <i className={`fas fa-sync-alt ${isSyncing ? 'fa-spin' : ''}`}></i>
             </button>
@@ -232,13 +233,6 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {isSyncing && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-2xl flex items-center justify-center gap-3 animate-pulse">
-            <i className="fas fa-cloud-download-alt text-green-600"></i>
-            <span className="text-[10px] font-black text-green-700 uppercase tracking-widest">Sincronizando con Commagra Cloud...</span>
-          </div>
-        )}
-
         <TaskList 
           tasks={filter === 'TODAS' ? tasks : tasks.filter(t => t.status === filter)} 
           onUpdateStatus={updateTaskStatus}
@@ -257,7 +251,6 @@ const App: React.FC = () => {
           onTestConnection={(url) => syncToGoogleSheet({url} as any, 'test')}
         />
       )}
-      <GeminiAssistant />
     </div>
   );
 };
