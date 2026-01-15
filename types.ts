@@ -10,6 +10,7 @@ export interface MarbleTask {
   id: string;
   montador: string;      
   fecha: string;        
+  deliveryDate: string; // Nueva: Fecha de entrega
   hora: string;         
   pedido: string;       
   clientName: string;   
@@ -17,8 +18,10 @@ export interface MarbleTask {
   material: string;     
   color: string;        
   status: TaskStatus;   
-  fileName: string;
-  fileData?: string; 
+  fileName: string;     // PDF Name
+  fileData?: string;    // PDF Data
+  dxfFileName?: string; // DXF Name
+  dxfFileData?: string; // DXF Data
   createdAt: number;
   syncedToSheet?: boolean;
 }
