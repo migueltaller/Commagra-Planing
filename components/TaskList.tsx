@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { MarbleTask, TaskStatus } from '../types';
 
@@ -20,14 +21,20 @@ const TaskList: React.FC<Props> = ({ tasks, onUpdateStatus, onDelete, onSendWhat
     );
   }
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => { window.print(); };
 
   const getDayName = (dateStr: string) => {
+    if (!dateStr) return "-";
     const date = new Date(dateStr);
     const days = ['DOMINGO', 'LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO'];
     return days[date.getDay()];
+  };
+
+  const downloadFile = (data: string, name: string) => {
+    const link = document.createElement('a');
+    link.href = data;
+    link.download = name;
+    link.click();
   };
 
   if (viewMode === 'table') {
@@ -45,23 +52,23 @@ const TaskList: React.FC<Props> = ({ tasks, onUpdateStatus, onDelete, onSendWhat
 
         <div className="bg-white rounded-[2rem] shadow-xl border border-gray-200 overflow-hidden print:border-none print:shadow-none">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[1000px] print:min-w-full">
+            <table className="w-full text-left border-collapse min-w-[1100px] print:min-w-full">
               <thead>
                 <tr className="bg-gray-950 text-white border-b border-gray-800">
-                  <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest w-32">Operario</th>
-                  <th className="px-2 py-5 text-[10px] font-black uppercase tracking-widest text-center w-40 print:hidden">Control</th>
-                  <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest w-40">Día / Fecha</th>
-                  <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest w-24">Pedido</th>
-                  <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest">Cliente / Tienda</th>
-                  <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest">Material y Trabajo</th>
-                  <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-right print:hidden">Acciones</th>
+                  <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest w-32">Montadores</th>
+                  <th className="px-2 py-5 text-[9px] font-black uppercase tracking-widest text-center w-40 print:hidden">Control</th>
+                  <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest w-40">Día Entrega</th>
+                  <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest w-24">Pedido</th>
+                  <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest">Cliente / Tienda</th>
+                  <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest">Trabajo</th>
+                  <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest text-right print:hidden">Planos</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {tasks.map(task => (
                   <tr key={task.id} className={`hover:bg-gray-50 transition-colors ${task.status === TaskStatus.URGENTE ? 'bg-red-50/30' : ''}`}>
                     <td className="px-6 py-4">
-                      <span className={`inline-block px-3 py-1 rounded-lg font-black text-[10px] uppercase border-2 ${task.status === TaskStatus.URGENTE ? 'border-red-600 text-red-600' : 'border-gray-950 text-gray-950'}`}>
+                      <span className={`inline-block px-3 py-1 rounded-lg font-black text-[9px] uppercase border-2 ${task.status === TaskStatus.URGENTE ? 'border-red-600 text-red-600' : 'border-gray-950 text-gray-950'}`}>
                         {task.montador}
                       </span>
                     </td>
@@ -77,19 +84,15 @@ const TaskList: React.FC<Props> = ({ tasks, onUpdateStatus, onDelete, onSendWhat
                             />
                           ))}
                         </div>
-                        <div className={`text-[8px] font-black flex items-center gap-1 ${task.syncedToSheet ? 'text-green-600' : 'text-amber-500'}`}>
-                          <i className={`fas ${task.syncedToSheet ? 'fa-check-double' : 'fa-sync fa-spin'}`}></i>
-                          {task.syncedToSheet ? 'EXCEL ACTUALIZADO' : 'SUBIENDO...'}
-                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className="font-black text-[11px] text-gray-950 tracking-tighter">{getDayName(task.fecha)}</span>
-                        <span className="text-[10px] text-gray-400 font-bold">{new Date(task.fecha).toLocaleDateString('es-ES')}</span>
+                        <span className="font-black text-[11px] text-red-600 tracking-tighter uppercase">{getDayName(task.deliveryDate)}</span>
+                        <span className="text-[9px] text-gray-400 font-bold">{new Date(task.deliveryDate).toLocaleDateString('es-ES')}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 font-mono text-[11px] text-red-600 font-black tracking-tighter">{task.pedido || 'S/N'}</td>
+                    <td className="px-6 py-4 font-mono text-[10px] text-gray-950 font-black tracking-tighter">{task.pedido || 'S/N'}</td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
                         <span className="font-black text-[12px] text-gray-900 uppercase leading-none">{task.clientName}</span>
@@ -98,34 +101,26 @@ const TaskList: React.FC<Props> = ({ tasks, onUpdateStatus, onDelete, onSendWhat
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1">
-                        <span className="font-black text-[10px] text-red-600 uppercase tracking-tight">{task.material} · {task.color}</span>
+                        <span className="font-black text-[10px] text-gray-950 uppercase tracking-tight">{task.material} · {task.color}</span>
                         <span className="text-[10px] text-gray-500 uppercase leading-tight italic line-clamp-1">{task.description}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right print:hidden">
-                      <div className="flex items-center justify-end gap-2">
-                         <button 
-                            onClick={() => onSendWhatsApp(task)}
-                            className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center hover:bg-green-600 hover:text-white transition-all shadow-sm"
-                            title="Reportar WhatsApp"
-                          >
-                            <i className="fab fa-whatsapp"></i>
-                          </button>
+                      <div className="flex items-center justify-end gap-1">
                          {task.fileData && (
-                          <button 
-                            onClick={() => {
-                              const link = document.createElement('a');
-                              link.href = task.fileData!;
-                              link.download = task.fileName;
-                              link.click();
-                            }}
-                            className="w-10 h-10 rounded-xl bg-red-50 text-red-600 flex items-center justify-center hover:bg-red-600 hover:text-white transition-all shadow-sm"
-                            title="Ver Plano"
-                          >
+                          <button onClick={() => downloadFile(task.fileData!, task.fileName)} className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center hover:bg-red-600 hover:text-white transition-all">
                             <i className="fas fa-file-pdf"></i>
                           </button>
                         )}
-                        <button onClick={() => onDelete(task.id)} className="w-10 h-10 rounded-xl text-gray-200 hover:text-red-600 hover:bg-red-50 transition-all">
+                        {task.dxfFileData && (
+                          <button onClick={() => downloadFile(task.dxfFileData!, task.dxfFileName!)} className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all">
+                            <i className="fas fa-file-code"></i>
+                          </button>
+                        )}
+                        <button onClick={() => onSendWhatsApp(task)} className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center hover:bg-green-600 hover:text-white transition-all">
+                          <i className="fab fa-whatsapp"></i>
+                        </button>
+                        <button onClick={() => onDelete(task.id)} className="w-8 h-8 rounded-lg text-gray-300 hover:text-red-600 transition-all">
                           <i className="fas fa-trash-alt"></i>
                         </button>
                       </div>
@@ -144,50 +139,41 @@ const TaskList: React.FC<Props> = ({ tasks, onUpdateStatus, onDelete, onSendWhat
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
       {tasks.map(task => (
         <div key={task.id} className={`bg-white rounded-[2.5rem] shadow-xl border-t-[12px] ${getStatusBorder(task.status)} overflow-hidden hover:shadow-2xl transition-all relative group`}>
-          <div className={`absolute top-4 right-6 text-[8px] font-black px-3 py-1 rounded-full flex items-center gap-1.5 ${task.syncedToSheet ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-            <i className={`fas ${task.syncedToSheet ? 'fa-cloud-check' : 'fa-cloud-arrow-up animate-pulse'}`}></i>
-            {task.syncedToSheet ? 'NUBE OK' : 'SINCRO'}
-          </div>
-
           <div className="p-8">
-            <div className="mb-6">
+            <div className="flex justify-between items-start mb-4">
               <span className="text-[10px] font-black bg-gray-950 text-white px-4 py-1.5 rounded-xl uppercase tracking-widest">{task.montador}</span>
+              <div className="flex flex-col items-end">
+                <span className="text-[9px] font-black text-red-600 uppercase">Entrega</span>
+                <span className="text-[11px] font-black text-gray-900">{new Date(task.deliveryDate).toLocaleDateString('es-ES')}</span>
+              </div>
             </div>
             
             <h3 className="text-2xl font-black text-gray-950 leading-none uppercase mb-2 tracking-tighter">{task.clientName}</h3>
-            <p className="text-xs font-black text-red-600 uppercase mb-6 tracking-wide">{task.material} <span className="text-gray-300 mx-1">/</span> {task.color}</p>
+            <p className="text-xs font-black text-red-600 uppercase mb-4 tracking-wide">{task.material} / {task.color}</p>
             
-            <div className="bg-gray-50 p-5 rounded-3xl border border-gray-100 mb-6 min-h-[80px]">
-              <p className="text-[11px] text-gray-600 font-bold uppercase leading-relaxed italic">{task.description}</p>
+            <div className="bg-gray-50 p-5 rounded-3xl border border-gray-100 mb-6 min-h-[70px]">
+              <p className="text-[10px] text-gray-600 font-bold uppercase italic">{task.description}</p>
             </div>
 
             <div className="flex justify-between items-center pt-6 border-t border-gray-100">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-black text-gray-950 uppercase">{getDayName(task.fecha)}</span>
-                <span className="text-[10px] font-bold text-gray-400">{new Date(task.fecha).toLocaleDateString('es-ES')}</span>
-              </div>
-              <div className="flex gap-3">
-                 <button 
-                    onClick={() => onSendWhatsApp(task)}
-                    className="w-12 h-12 rounded-2xl bg-green-500 text-white flex items-center justify-center hover:bg-green-600 transition-all shadow-lg"
-                  >
-                    <i className="fab fa-whatsapp text-xl"></i>
-                  </button>
+              <div className="flex gap-2">
                  {task.fileData && (
-                  <button 
-                    onClick={() => {
-                      const link = document.createElement('a');
-                      link.href = task.fileData!;
-                      link.download = task.fileName;
-                      link.click();
-                    }}
-                    className="w-12 h-12 rounded-2xl bg-red-600 text-white flex items-center justify-center hover:bg-black transition-all shadow-lg"
-                  >
-                    <i className="fas fa-file-pdf text-xl"></i>
+                  <button onClick={() => downloadFile(task.fileData!, task.fileName)} className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-lg">
+                    <i className="fas fa-file-pdf"></i>
                   </button>
                 )}
+                {task.dxfFileData && (
+                  <button onClick={() => downloadFile(task.dxfFileData!, task.dxfFileName!)} className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg">
+                    <i className="fas fa-file-code"></i>
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-3">
+                 <button onClick={() => onSendWhatsApp(task)} className="w-10 h-10 rounded-xl bg-green-500 text-white flex items-center justify-center shadow-lg">
+                    <i className="fab fa-whatsapp"></i>
+                  </button>
                 <button onClick={() => onDelete(task.id)} className="text-gray-200 hover:text-red-600 transition-colors">
-                  <i className="fas fa-trash-alt text-lg"></i>
+                  <i className="fas fa-trash-alt"></i>
                 </button>
               </div>
             </div>
