@@ -92,20 +92,29 @@ const App: React.FC = () => {
     try {
       const url = `${settings.googleSheetWebhookUrl}?action=read`;
       const response = await fetch(url);
-      if (!response.ok) throw new Error("Error");
+      if (!response.ok) throw new Error("Error de red");
       const cloudTasks = await response.json();
       if (Array.isArray(cloudTasks)) {
         const mappedTasks: MarbleTask[] = cloudTasks.map((t: any) => ({
           ...t,
           id: String(t.id),
+          clientName: t.cliente || t.clientName,
+          deliveryDate: t.fechaEntrega || t.deliveryDate,
+          montador: t.montadores || t.montador,
+          status: t.estado || t.status,
+          description: t.descripcion || t.description || '',
+          fileName: t.planoPdf || t.fileName || '',
+          fileData: t.planoPdfData || t.fileData || '',
+          dxfFileName: t.planoDxf || t.dxfFileName || '',
+          dxfFileData: t.planoDxfData || t.dxfFileData || '',
           syncedToSheet: true,
           createdAt: Number(t.createdAt || Date.now())
         }));
         setTasks(mappedTasks);
-        alert("✅ Nube sincronizada con éxito.");
+        alert("✅ Nube sincronizada: Todos los datos y planos actualizados.");
       }
     } catch (error) {
-      alert("❌ Error al conectar con la nube.");
+      alert("❌ Error al conectar con la nube. Verifica la URL del Script.");
     } finally {
       setIsSyncing(false);
     }
@@ -116,7 +125,7 @@ const App: React.FC = () => {
     const url = (action === 'test' && (task as any).url) ? (task as any).url : settings.googleSheetWebhookUrl;
     if (!url || !url.includes('/exec')) return false;
     
-    // Payload completo recuperado
+    // Enviamos el payload completo incluyendo los datos base64 para que el otro dispositivo los vea
     const payload = { 
       action, 
       id: task.id, 
@@ -127,9 +136,11 @@ const App: React.FC = () => {
       fechaEntrega: task.deliveryDate, 
       pedido: task.pedido, 
       montadores: task.montador,
-      descripcion: task.description, // Recuperado
-      planoPdf: task.fileName || '',  // Recuperado
-      planoDxf: task.dxfFileName || '' // Recuperado
+      descripcion: task.description,
+      planoPdf: task.fileName || '',
+      planoPdfData: task.fileData || '', // Dato vital para ver planos en otros dispositivos
+      planoDxf: task.dxfFileName || '',
+      planoDxfData: task.dxfFileData || '' // Dato vital para ver planos en otros dispositivos
     };
 
     try {
@@ -148,13 +159,13 @@ const App: React.FC = () => {
     setTasks(prev => [newTask, ...prev]);
     setIsFormOpen(false);
     
-    // 1. Sincronizar con Google Sheets
+    // 1. Sincronizar con Google Sheets inmediatamente
     syncToGoogleSheet(newTask, 'add');
     
-    // 2. Abrir automáticamente el menú de WhatsApp para la nueva tarea
+    // 2. Saltar menú de WhatsApp para esta tarea nueva
     setTimeout(() => {
       handleWhatsAppRequest(newTask);
-    }, 500);
+    }, 400);
   };
 
   const updateTaskStatus = (id: string, newStatus: TaskStatus) => {
@@ -183,10 +194,10 @@ const App: React.FC = () => {
         <DashboardStats tasks={visibleTasks} />
 
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 space-y-4 md:space-y-0 bg-white p-4 rounded-[2rem] shadow-xl border border-gray-100">
-          <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
-            <div className="flex bg-gray-100 p-1 rounded-2xl">
+          <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
+            <div className="flex bg-gray-100 p-1 rounded-2xl min-w-max">
               {(['TODAS', TaskStatus.PENDIENTE, TaskStatus.EN_CORTE, TaskStatus.ACABADO, TaskStatus.URGENTE] as const).map((s) => (
-                <button key={s} onClick={() => setFilter(s)} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${filter === s ? 'bg-white text-red-600 shadow-sm' : 'text-gray-400'}`}>
+                <button key={s} onClick={() => setFilter(s)} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${filter === s ? 'bg-white text-red-600 shadow-sm' : 'text-gray-400'}`}>
                   {s}
                 </button>
               ))}
@@ -202,12 +213,12 @@ const App: React.FC = () => {
         <TaskList tasks={filteredTasks} onUpdateStatus={updateTaskStatus} onDelete={deleteTask} viewMode={viewMode} onSendWhatsApp={handleWhatsAppRequest} />
       </main>
 
-      {/* MODAL DE SELECCIÓN DE WHATSAPP */}
+      {/* MENÚ COMPARTIR WHATSAPP */}
       {activeTaskForWA && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-end sm:items-center justify-center p-4">
           <div className="bg-white w-full max-w-sm rounded-[2rem] overflow-hidden animate-in slide-in-from-bottom duration-300 shadow-2xl border border-gray-100">
-            <div className="p-6 text-center border-b border-gray-100">
-              <h3 className="font-black uppercase italic text-gray-900 leading-none">Compartir Reporte</h3>
+            <div className="p-6 text-center border-b border-gray-100 bg-gray-50/50">
+              <h3 className="font-black uppercase italic text-gray-900 leading-none">Compartir con...</h3>
               <p className="text-[10px] font-bold text-gray-400 uppercase mt-2 tracking-widest">{activeTaskForWA.clientName}</p>
             </div>
             <div className="p-4 space-y-2">
@@ -248,8 +259,8 @@ const App: React.FC = () => {
                     <i className="fas fa-share-alt"></i>
                   </div>
                   <div className="text-left">
-                    <p className="text-[10px] font-black uppercase text-gray-400 leading-none">Elegir de mi agenda</p>
-                    <p className="font-black uppercase">Grupo o Contacto</p>
+                    <p className="text-[10px] font-black uppercase text-gray-400 leading-none">Mi Agenda (Grupos)</p>
+                    <p className="font-black uppercase">Elegir destino</p>
                   </div>
                 </button>
               )}
@@ -257,7 +268,7 @@ const App: React.FC = () => {
                 onClick={() => setActiveTaskForWA(null)}
                 className="w-full py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2 hover:text-red-600"
               >
-                Cerrar Menú
+                Cerrar
               </button>
             </div>
           </div>
