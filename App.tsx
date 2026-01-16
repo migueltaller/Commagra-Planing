@@ -94,27 +94,33 @@ const App: React.FC = () => {
       const response = await fetch(url);
       if (!response.ok) throw new Error("Error de red");
       const cloudTasks = await response.json();
+      
       if (Array.isArray(cloudTasks)) {
+        // Fix: Added missing properties 'fecha' and 'hora' to the mapping to satisfy the MarbleTask interface
         const mappedTasks: MarbleTask[] = cloudTasks.map((t: any) => ({
-          ...t,
           id: String(t.id),
-          clientName: t.cliente || t.clientName,
-          deliveryDate: t.fechaEntrega || t.deliveryDate,
-          montador: t.montadores || t.montador,
-          status: t.estado || t.status,
-          description: t.descripcion || t.description || '',
-          fileName: t.planoPdf || t.fileName || '',
-          fileData: t.planoPdfData || t.fileData || '',
-          dxfFileName: t.planoDxf || t.dxfFileName || '',
-          dxfFileData: t.planoDxfData || t.dxfFileData || '',
-          syncedToSheet: true,
-          createdAt: Number(t.createdAt || Date.now())
+          montador: t.montador || '',
+          fecha: t.fecha || '',
+          hora: t.hora || '',
+          clientName: t.clientName || '',
+          material: t.material || '',
+          color: t.color || '',
+          status: t.status || TaskStatus.PENDIENTE,
+          pedido: t.pedido || '',
+          deliveryDate: t.deliveryDate || '',
+          description: t.description || '',
+          fileName: t.fileName || '',
+          fileData: t.fileData || '',
+          dxfFileName: t.dxfFileName || '',
+          dxfFileData: t.dxfFileData || '',
+          createdAt: Number(t.createdAt || Date.now()),
+          syncedToSheet: true
         }));
         setTasks(mappedTasks);
-        alert("✅ Nube sincronizada: Todos los datos y planos actualizados.");
+        alert("✅ Sincronización completa. Los planos ahora son visibles en este terminal.");
       }
     } catch (error) {
-      alert("❌ Error al conectar con la nube. Verifica la URL del Script.");
+      alert("❌ Error al descargar datos de la nube.");
     } finally {
       setIsSyncing(false);
     }
@@ -125,25 +131,30 @@ const App: React.FC = () => {
     const url = (action === 'test' && (task as any).url) ? (task as any).url : settings.googleSheetWebhookUrl;
     if (!url || !url.includes('/exec')) return false;
     
-    // Enviamos el payload completo incluyendo los datos base64 para que el otro dispositivo los vea
+    // Payload con nombres de campos unificados para el script
+    // Fix: Added 'fecha' and 'hora' to the payload to ensure they are synchronized with the sheet
     const payload = { 
       action, 
       id: task.id, 
+      montador: task.montador,
+      fecha: task.fecha,
+      hora: task.hora,
+      clientName: task.clientName,
       material: task.material, 
       color: task.color,
-      estado: task.status, 
-      cliente: task.clientName, 
-      fechaEntrega: task.deliveryDate, 
-      pedido: task.pedido, 
-      montadores: task.montador,
-      descripcion: task.description,
-      planoPdf: task.fileName || '',
-      planoPdfData: task.fileData || '', // Dato vital para ver planos en otros dispositivos
-      planoDxf: task.dxfFileName || '',
-      planoDxfData: task.dxfFileData || '' // Dato vital para ver planos en otros dispositivos
+      status: task.status, 
+      pedido: task.pedido,
+      deliveryDate: task.deliveryDate, 
+      description: task.description,
+      fileName: task.fileName || '',
+      fileData: task.fileData || '', 
+      dxfFileName: task.dxfFileName || '',
+      dxfFileData: task.dxfFileData || '',
+      createdAt: task.createdAt
     };
 
     try {
+      // Usamos POST para enviar los datos (incluyendo los base64 largos)
       await fetch(url, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
       return true;
     } catch (e) { return false; }
@@ -159,13 +170,9 @@ const App: React.FC = () => {
     setTasks(prev => [newTask, ...prev]);
     setIsFormOpen(false);
     
-    // 1. Sincronizar con Google Sheets inmediatamente
+    // Sincronizar y luego preguntar por WhatsApp
     syncToGoogleSheet(newTask, 'add');
-    
-    // 2. Saltar menú de WhatsApp para esta tarea nueva
-    setTimeout(() => {
-      handleWhatsAppRequest(newTask);
-    }, 400);
+    setTimeout(() => handleWhatsAppRequest(newTask), 500);
   };
 
   const updateTaskStatus = (id: string, newStatus: TaskStatus) => {
@@ -204,7 +211,14 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="flex gap-3 w-full md:w-auto">
-            <button onClick={pullFromCloud} disabled={isSyncing} className="w-12 h-12 rounded-2xl bg-green-600 text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform"><i className={`fas fa-sync-alt ${isSyncing ? 'fa-spin' : ''}`}></i></button>
+            <button 
+              onClick={pullFromCloud} 
+              disabled={isSyncing} 
+              className="w-12 h-12 rounded-2xl bg-green-600 text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform"
+              title="Descargar datos de la nube"
+            >
+              <i className={`fas fa-sync-alt ${isSyncing ? 'fa-spin' : ''}`}></i>
+            </button>
             <button onClick={() => setViewMode(viewMode === 'table' ? 'cards' : 'table')} className="bg-gray-200 text-gray-600 w-12 h-12 rounded-2xl flex items-center justify-center"><i className={`fas ${viewMode === 'table' ? 'fa-th-large' : 'fa-list'}`}></i></button>
             <button onClick={() => setIsFormOpen(true)} className="flex-1 md:flex-none bg-red-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs shadow-lg active:scale-95 transition-all">NUEVO TRABAJO</button>
           </div>
@@ -213,63 +227,34 @@ const App: React.FC = () => {
         <TaskList tasks={filteredTasks} onUpdateStatus={updateTaskStatus} onDelete={deleteTask} viewMode={viewMode} onSendWhatsApp={handleWhatsAppRequest} />
       </main>
 
-      {/* MENÚ COMPARTIR WHATSAPP */}
+      {/* MODAL WHATSAPP */}
       {activeTaskForWA && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-end sm:items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-[2rem] overflow-hidden animate-in slide-in-from-bottom duration-300 shadow-2xl border border-gray-100">
+          <div className="bg-white w-full max-w-sm rounded-[2rem] overflow-hidden animate-in slide-in-from-bottom duration-300 shadow-2xl">
             <div className="p-6 text-center border-b border-gray-100 bg-gray-50/50">
-              <h3 className="font-black uppercase italic text-gray-900 leading-none">Compartir con...</h3>
+              <h3 className="font-black uppercase italic text-gray-900 leading-none">Enviar Reporte</h3>
               <p className="text-[10px] font-bold text-gray-400 uppercase mt-2 tracking-widest">{activeTaskForWA.clientName}</p>
             </div>
             <div className="p-4 space-y-2">
               {settings.whatsappNumber && (
-                <button 
-                  onClick={() => executeWhatsAppSend(activeTaskForWA, settings.whatsappNumber)}
-                  className="w-full p-4 bg-gray-50 hover:bg-green-50 rounded-2xl flex items-center gap-4 transition-colors group"
-                >
-                  <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center group-hover:bg-green-600 group-hover:text-white transition-all">
-                    <i className="fas fa-user"></i>
-                  </div>
-                  <div className="text-left">
-                    <p className="text-[10px] font-black uppercase text-gray-400 leading-none">Enviar a</p>
-                    <p className="font-black text-gray-900 uppercase">{settings.whatsappLabel1 || 'Contacto 1'}</p>
-                  </div>
+                <button onClick={() => executeWhatsAppSend(activeTaskForWA, settings.whatsappNumber)} className="w-full p-4 bg-gray-50 hover:bg-green-50 rounded-2xl flex items-center gap-4 transition-colors">
+                  <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center"><i className="fas fa-user"></i></div>
+                  <div className="text-left"><p className="text-[10px] font-black uppercase text-gray-400 leading-none">Contacto 1</p><p className="font-black text-gray-900 uppercase">{settings.whatsappLabel1}</p></div>
                 </button>
               )}
               {settings.whatsappNumber2 && (
-                <button 
-                  onClick={() => executeWhatsAppSend(activeTaskForWA, settings.whatsappNumber2)}
-                  className="w-full p-4 bg-gray-50 hover:bg-green-50 rounded-2xl flex items-center gap-4 transition-colors group"
-                >
-                  <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center group-hover:bg-green-600 group-hover:text-white transition-all">
-                    <i className="fas fa-user-friends"></i>
-                  </div>
-                  <div className="text-left">
-                    <p className="text-[10px] font-black uppercase text-gray-400 leading-none">Enviar a</p>
-                    <p className="font-black text-gray-900 uppercase">{settings.whatsappLabel2 || 'Contacto 2'}</p>
-                  </div>
+                <button onClick={() => executeWhatsAppSend(activeTaskForWA, settings.whatsappNumber2)} className="w-full p-4 bg-gray-50 hover:bg-green-50 rounded-2xl flex items-center gap-4 transition-colors">
+                  <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center"><i className="fas fa-user-friends"></i></div>
+                  <div className="text-left"><p className="text-[10px] font-black uppercase text-gray-400 leading-none">Contacto 2</p><p className="font-black text-gray-900 uppercase">{settings.whatsappLabel2}</p></div>
                 </button>
               )}
               {settings.whatsappManualEnabled && (
-                <button 
-                  onClick={() => executeWhatsAppSend(activeTaskForWA)}
-                  className="w-full p-4 bg-gray-900 text-white rounded-2xl flex items-center gap-4 hover:bg-black transition-colors shadow-lg"
-                >
-                  <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
-                    <i className="fas fa-share-alt"></i>
-                  </div>
-                  <div className="text-left">
-                    <p className="text-[10px] font-black uppercase text-gray-400 leading-none">Mi Agenda (Grupos)</p>
-                    <p className="font-black uppercase">Elegir destino</p>
-                  </div>
+                <button onClick={() => executeWhatsAppSend(activeTaskForWA)} className="w-full p-4 bg-gray-900 text-white rounded-2xl flex items-center gap-4 shadow-lg transition-transform active:scale-95">
+                  <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center"><i className="fas fa-share-alt"></i></div>
+                  <div className="text-left"><p className="text-[10px] font-black uppercase text-gray-400 leading-none">Grupos / Agenda</p><p className="font-black uppercase">Compartir Libre</p></div>
                 </button>
               )}
-              <button 
-                onClick={() => setActiveTaskForWA(null)}
-                className="w-full py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2 hover:text-red-600"
-              >
-                Cerrar
-              </button>
+              <button onClick={() => setActiveTaskForWA(null)} className="w-full py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">Cancelar</button>
             </div>
           </div>
         </div>
