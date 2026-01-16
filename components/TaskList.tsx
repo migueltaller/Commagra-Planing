@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { MarbleTask, TaskStatus } from '../types';
 
@@ -23,17 +22,34 @@ const TaskList: React.FC<Props> = ({ tasks, onUpdateStatus, onDelete, onSendWhat
 
   const handlePrint = () => { window.print(); };
 
+  const formatDate = (dateStr: string) => {
+    if (!dateStr || dateStr.trim() === "") return "Pte. Fecha";
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return "Fecha Error";
+      return date.toLocaleDateString('es-ES');
+    } catch(e) {
+      return "Fecha Error";
+    }
+  };
+
   const getDayName = (dateStr: string) => {
-    if (!dateStr) return "-";
-    const date = new Date(dateStr);
-    const days = ['DOMINGO', 'LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO'];
-    return days[date.getDay()];
+    if (!dateStr || dateStr.trim() === "") return "-";
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return "-";
+      const days = ['DOMINGO', 'LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO'];
+      return days[date.getDay()];
+    } catch(e) {
+      return "-";
+    }
   };
 
   const downloadFile = (data: string, name: string) => {
+    if (!data) return;
     const link = document.createElement('a');
     link.href = data;
-    link.download = name;
+    link.download = name || 'archivo';
     link.click();
   };
 
@@ -52,12 +68,12 @@ const TaskList: React.FC<Props> = ({ tasks, onUpdateStatus, onDelete, onSendWhat
 
         <div className="bg-white rounded-[2rem] shadow-xl border border-gray-200 overflow-hidden print:border-none print:shadow-none">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[1100px] print:min-w-full">
+            <table className="w-full text-left border-collapse min-w-[1000px] print:min-w-full">
               <thead>
                 <tr className="bg-gray-950 text-white border-b border-gray-800">
                   <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest w-32">Montadores</th>
                   <th className="px-2 py-5 text-[9px] font-black uppercase tracking-widest text-center w-40 print:hidden">Control</th>
-                  <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest w-40">Día Entrega</th>
+                  <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest w-32">Día Entrega</th>
                   <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest w-24">Pedido</th>
                   <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest">Cliente / Tienda</th>
                   <th className="px-6 py-5 text-[9px] font-black uppercase tracking-widest">Trabajo</th>
@@ -69,13 +85,13 @@ const TaskList: React.FC<Props> = ({ tasks, onUpdateStatus, onDelete, onSendWhat
                   <tr key={task.id} className={`hover:bg-gray-50 transition-colors ${task.status === TaskStatus.URGENTE ? 'bg-red-50/30' : ''}`}>
                     <td className="px-6 py-4">
                       <span className={`inline-block px-3 py-1 rounded-lg font-black text-[9px] uppercase border-2 ${task.status === TaskStatus.URGENTE ? 'border-red-600 text-red-600' : 'border-gray-950 text-gray-950'}`}>
-                        {task.montador}
+                        {task.montador || 'S/M'}
                       </span>
                     </td>
                     <td className="px-2 py-4 print:hidden">
                       <div className="flex flex-col items-center gap-2">
                         <div className="flex justify-center gap-1">
-                          {Object.values(TaskStatus).map(s => (
+                          {[TaskStatus.PENDIENTE, TaskStatus.EN_CORTE, TaskStatus.ACABADO, TaskStatus.URGENTE].map(s => (
                             <button
                               key={s}
                               onClick={() => onUpdateStatus(task.id, s)}
@@ -89,20 +105,20 @@ const TaskList: React.FC<Props> = ({ tasks, onUpdateStatus, onDelete, onSendWhat
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
                         <span className="font-black text-[11px] text-red-600 tracking-tighter uppercase">{getDayName(task.deliveryDate)}</span>
-                        <span className="text-[9px] text-gray-400 font-bold">{new Date(task.deliveryDate).toLocaleDateString('es-ES')}</span>
+                        <span className="text-[9px] text-gray-400 font-bold">{formatDate(task.deliveryDate)}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 font-mono text-[10px] text-gray-950 font-black tracking-tighter">{task.pedido || 'S/N'}</td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className="font-black text-[12px] text-gray-900 uppercase leading-none">{task.clientName}</span>
+                        <span className="font-black text-[12px] text-gray-900 uppercase leading-none">{task.clientName || 'SIN NOMBRE'}</span>
                         <span className={`text-[9px] font-bold uppercase mt-1 ${getStatusText(task.status)}`}>{task.status}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1">
-                        <span className="font-black text-[10px] text-gray-950 uppercase tracking-tight">{task.material} · {task.color}</span>
-                        <span className="text-[10px] text-gray-500 uppercase leading-tight italic line-clamp-1">{task.description}</span>
+                        <span className="font-black text-[10px] text-gray-950 uppercase tracking-tight">{(task.material || 'S/M')} · {(task.color || 'S/C')}</span>
+                        <span className="text-[10px] text-gray-500 uppercase leading-tight italic line-clamp-1">{task.description || '.'}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right print:hidden">
@@ -141,18 +157,18 @@ const TaskList: React.FC<Props> = ({ tasks, onUpdateStatus, onDelete, onSendWhat
         <div key={task.id} className={`bg-white rounded-[2.5rem] shadow-xl border-t-[12px] ${getStatusBorder(task.status)} overflow-hidden hover:shadow-2xl transition-all relative group`}>
           <div className="p-8">
             <div className="flex justify-between items-start mb-4">
-              <span className="text-[10px] font-black bg-gray-950 text-white px-4 py-1.5 rounded-xl uppercase tracking-widest">{task.montador}</span>
+              <span className="text-[10px] font-black bg-gray-950 text-white px-4 py-1.5 rounded-xl uppercase tracking-widest">{task.montador || 'S/M'}</span>
               <div className="flex flex-col items-end">
                 <span className="text-[9px] font-black text-red-600 uppercase">Entrega</span>
-                <span className="text-[11px] font-black text-gray-900">{new Date(task.deliveryDate).toLocaleDateString('es-ES')}</span>
+                <span className="text-[11px] font-black text-gray-900">{formatDate(task.deliveryDate)}</span>
               </div>
             </div>
             
-            <h3 className="text-2xl font-black text-gray-950 leading-none uppercase mb-2 tracking-tighter">{task.clientName}</h3>
-            <p className="text-xs font-black text-red-600 uppercase mb-4 tracking-wide">{task.material} / {task.color}</p>
+            <h3 className="text-2xl font-black text-gray-950 leading-none uppercase mb-2 tracking-tighter">{task.clientName || 'SIN NOMBRE'}</h3>
+            <p className="text-xs font-black text-red-600 uppercase mb-4 tracking-wide">{task.material || 'S/M'} / {task.color || 'S/C'}</p>
             
             <div className="bg-gray-50 p-5 rounded-3xl border border-gray-100 mb-6 min-h-[70px]">
-              <p className="text-[10px] text-gray-600 font-bold uppercase italic">{task.description}</p>
+              <p className="text-[10px] text-gray-600 font-bold uppercase italic">{task.description || 'Sin descripción'}</p>
             </div>
 
             <div className="flex justify-between items-center pt-6 border-t border-gray-100">
