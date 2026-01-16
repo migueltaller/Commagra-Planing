@@ -63,7 +63,6 @@ const App: React.FC = () => {
       const cleanPhone = phone.replace(/\D/g, '');
       url = `https://wa.me/${cleanPhone}?text=${message}`;
     } else {
-      // Link universal para elegir contacto o grupo manualmente
       url = `https://api.whatsapp.com/send?text=${message}`;
     }
     window.open(url, '_blank');
@@ -75,13 +74,11 @@ const App: React.FC = () => {
     const hasNum2 = !!settings.whatsappNumber2;
     const hasManual = settings.whatsappManualEnabled;
 
-    // Si solo hay una opción configurada, enviar directo
     if (hasNum1 && !hasNum2 && !hasManual) {
       executeWhatsAppSend(task, settings.whatsappNumber);
     } else if (!hasNum1 && !hasNum2 && hasManual) {
       executeWhatsAppSend(task);
     } else {
-      // Mostrar modal de elección
       setActiveTaskForWA(task);
     }
   };
@@ -153,7 +150,8 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-gray-50 pb-20">
       <Header onOpenSettings={() => setIsSettingsOpen(true)} settings={settings} />
       
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10 relative z-20">
+      {/* Ajustado -mt-6 para móviles para dar espacio al indicador de estado */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 md:-mt-10 relative z-20">
         <DashboardStats tasks={visibleTasks} />
 
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 space-y-4 md:space-y-0 bg-white p-4 rounded-[2rem] shadow-xl border border-gray-100">
