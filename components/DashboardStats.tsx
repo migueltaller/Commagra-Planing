@@ -17,15 +17,17 @@ const DashboardStats: React.FC<Props> = ({ tasks }) => {
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-10">
       {stats.map((stat) => (
-        <div key={stat.label} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4">
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${stat.color} text-xl`}>
+        <div key={stat.label} className="bg-white p-3 md:p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-2 md:gap-4 overflow-hidden">
+          <div className={`shrink-0 w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center ${stat.color} text-base md:text-xl`}>
             <i className={`fas ${stat.icon}`}></i>
           </div>
-          <div>
-            <p className="text-gray-400 text-[10px] font-black uppercase tracking-wider">{stat.label}</p>
-            <p className="text-2xl font-black text-gray-900">{stat.count}</p>
+          <div className="min-w-0">
+            <p className="text-gray-400 text-[8px] md:text-[10px] font-black uppercase tracking-tight md:tracking-wider whitespace-nowrap overflow-hidden text-ellipsis">
+              {stat.label}
+            </p>
+            <p className="text-xl md:text-2xl font-black text-gray-900 leading-none">{stat.count}</p>
           </div>
         </div>
       ))}
