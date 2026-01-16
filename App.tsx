@@ -102,9 +102,10 @@ const App: React.FC = () => {
           createdAt: Number(t.createdAt || Date.now())
         }));
         setTasks(mappedTasks);
+        alert("✅ Nube sincronizada con éxito.");
       }
     } catch (error) {
-      alert("Error al sincronizar.");
+      alert("❌ Error al conectar con la nube.");
     } finally {
       setIsSyncing(false);
     }
@@ -114,7 +115,23 @@ const App: React.FC = () => {
     if (!settings.googleSheetEnabled && action !== 'test') return false;
     const url = (action === 'test' && (task as any).url) ? (task as any).url : settings.googleSheetWebhookUrl;
     if (!url || !url.includes('/exec')) return false;
-    const payload = { action, id: task.id, material: task.material, estado: task.status, cliente: task.clientName, fechaEntrega: task.deliveryDate, pedido: task.pedido, montadores: task.montador };
+    
+    // Payload completo recuperado
+    const payload = { 
+      action, 
+      id: task.id, 
+      material: task.material, 
+      color: task.color,
+      estado: task.status, 
+      cliente: task.clientName, 
+      fechaEntrega: task.deliveryDate, 
+      pedido: task.pedido, 
+      montadores: task.montador,
+      descripcion: task.description, // Recuperado
+      planoPdf: task.fileName || '',  // Recuperado
+      planoDxf: task.dxfFileName || '' // Recuperado
+    };
+
     try {
       await fetch(url, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
       return true;
@@ -122,10 +139,22 @@ const App: React.FC = () => {
   };
 
   const addTask = (taskData: Omit<MarbleTask, 'id' | 'createdAt'>) => {
-    const newTask: MarbleTask = { ...taskData, id: Math.random().toString(36).substr(2, 6).toUpperCase(), createdAt: Date.now(), syncedToSheet: false };
+    const newTask: MarbleTask = { 
+      ...taskData, 
+      id: Math.random().toString(36).substr(2, 6).toUpperCase(), 
+      createdAt: Date.now(), 
+      syncedToSheet: false 
+    };
     setTasks(prev => [newTask, ...prev]);
     setIsFormOpen(false);
-    setTimeout(() => syncToGoogleSheet(newTask, 'add'), 500);
+    
+    // 1. Sincronizar con Google Sheets
+    syncToGoogleSheet(newTask, 'add');
+    
+    // 2. Abrir automáticamente el menú de WhatsApp para la nueva tarea
+    setTimeout(() => {
+      handleWhatsAppRequest(newTask);
+    }, 500);
   };
 
   const updateTaskStatus = (id: string, newStatus: TaskStatus) => {
@@ -150,7 +179,6 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-gray-50 pb-20">
       <Header onOpenSettings={() => setIsSettingsOpen(true)} settings={settings} />
       
-      {/* Ajustado -mt-6 para móviles para dar espacio al indicador de estado */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 md:-mt-10 relative z-20">
         <DashboardStats tasks={visibleTasks} />
 
@@ -165,9 +193,9 @@ const App: React.FC = () => {
             </div>
           </div>
           <div className="flex gap-3 w-full md:w-auto">
-            <button onClick={pullFromCloud} disabled={isSyncing} className="w-12 h-12 rounded-2xl bg-green-600 text-white flex items-center justify-center shadow-lg"><i className={`fas fa-sync-alt ${isSyncing ? 'fa-spin' : ''}`}></i></button>
+            <button onClick={pullFromCloud} disabled={isSyncing} className="w-12 h-12 rounded-2xl bg-green-600 text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform"><i className={`fas fa-sync-alt ${isSyncing ? 'fa-spin' : ''}`}></i></button>
             <button onClick={() => setViewMode(viewMode === 'table' ? 'cards' : 'table')} className="bg-gray-200 text-gray-600 w-12 h-12 rounded-2xl flex items-center justify-center"><i className={`fas ${viewMode === 'table' ? 'fa-th-large' : 'fa-list'}`}></i></button>
-            <button onClick={() => setIsFormOpen(true)} className="flex-1 md:flex-none bg-red-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs">NUEVO TRABAJO</button>
+            <button onClick={() => setIsFormOpen(true)} className="flex-1 md:flex-none bg-red-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs shadow-lg active:scale-95 transition-all">NUEVO TRABAJO</button>
           </div>
         </div>
 
@@ -177,10 +205,10 @@ const App: React.FC = () => {
       {/* MODAL DE SELECCIÓN DE WHATSAPP */}
       {activeTaskForWA && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-end sm:items-center justify-center p-4">
-          <div className="bg-white w-full max-w-sm rounded-[2rem] overflow-hidden animate-in slide-in-from-bottom duration-300 shadow-2xl">
+          <div className="bg-white w-full max-w-sm rounded-[2rem] overflow-hidden animate-in slide-in-from-bottom duration-300 shadow-2xl border border-gray-100">
             <div className="p-6 text-center border-b border-gray-100">
-              <h3 className="font-black uppercase italic text-gray-900">¿Dónde enviar reporte?</h3>
-              <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">{activeTaskForWA.clientName}</p>
+              <h3 className="font-black uppercase italic text-gray-900 leading-none">Compartir Reporte</h3>
+              <p className="text-[10px] font-bold text-gray-400 uppercase mt-2 tracking-widest">{activeTaskForWA.clientName}</p>
             </div>
             <div className="p-4 space-y-2">
               {settings.whatsappNumber && (
@@ -214,7 +242,7 @@ const App: React.FC = () => {
               {settings.whatsappManualEnabled && (
                 <button 
                   onClick={() => executeWhatsAppSend(activeTaskForWA)}
-                  className="w-full p-4 bg-gray-900 text-white rounded-2xl flex items-center gap-4 hover:bg-black transition-colors"
+                  className="w-full p-4 bg-gray-900 text-white rounded-2xl flex items-center gap-4 hover:bg-black transition-colors shadow-lg"
                 >
                   <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
                     <i className="fas fa-share-alt"></i>
@@ -227,9 +255,9 @@ const App: React.FC = () => {
               )}
               <button 
                 onClick={() => setActiveTaskForWA(null)}
-                className="w-full py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2"
+                className="w-full py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2 hover:text-red-600"
               >
-                Cancelar
+                Cerrar Menú
               </button>
             </div>
           </div>
