@@ -11,7 +11,6 @@ const Header: React.FC<Props> = ({ onOpenSettings, settings }) => {
   const [showShareModal, setShowShareModal] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Detectamos la URL real donde esté alojada la App
   const currentUrl = window.location.href;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(currentUrl)}`;
 
@@ -22,104 +21,77 @@ const Header: React.FC<Props> = ({ onOpenSettings, settings }) => {
   };
 
   return (
-    <header className="bg-white border-b-[8px] md:border-b-[20px] border-red-600 shadow-2xl relative overflow-hidden print:py-4 print:border-b-4">
-      {/* Decoración de fondo marmolada */}
-      <div className="absolute top-0 left-0 w-full h-full opacity-[0.03] pointer-events-none flex items-center justify-center select-none">
-        <span className="text-[25vw] font-black italic tracking-tighter">MARMOL</span>
+    <header className="bg-white border-b-[6px] md:border-b-[16px] border-red-600 shadow-2xl relative overflow-hidden print:py-4 print:border-b-4">
+      {/* Fondo decorativo */}
+      <div className="absolute top-0 left-0 w-full h-full opacity-[0.01] pointer-events-none flex items-center justify-center select-none">
+        <span className="text-[25vw] font-black italic tracking-tighter">COMMAGRA</span>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 flex flex-col items-center">
+      <div className="max-w-7xl mx-auto px-4 relative z-10 flex flex-col items-center">
         
-        {/* BARRA DE HERRAMIENTAS SUPERIOR */}
-        <div className="w-full flex justify-end items-center gap-2 md:gap-3 pt-4 md:pt-8 pb-4 md:pb-10 print:hidden">
-          <div className="hidden md:flex flex-col items-end mr-4">
-            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Gestión de Producción</span>
-            <span className="text-[10px] font-bold text-red-600 uppercase italic">Sistema en la Nube v2.0</span>
-          </div>
-          
+        {/* Botones de acción rápidos */}
+        <div className="w-full flex justify-end items-center gap-2 pt-4 pb-2 md:pb-6 print:hidden">
           <button 
             onClick={() => setShowShareModal(true)}
-            className="w-9 h-9 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-green-600 text-white flex items-center justify-center hover:bg-black transition-all shadow-xl border-2 border-white/20 active:scale-95"
-            title="Compartir enlace de acceso"
+            className="w-10 h-10 md:w-14 md:h-14 rounded-xl bg-green-600 text-white flex items-center justify-center hover:bg-black transition-all shadow-lg active:scale-95"
+            title="Compartir App"
           >
-            <i className="fas fa-mobile-alt text-sm md:text-xl"></i>
+            <i className="fas fa-mobile-alt"></i>
           </button>
           
           <button 
             onClick={onOpenSettings}
-            className="w-9 h-9 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-gray-950 text-white flex items-center justify-center hover:bg-red-600 transition-all shadow-xl group border-2 border-white/20 active:scale-95"
-            title="Configuración"
+            className="w-10 h-10 md:w-14 md:h-14 rounded-xl bg-gray-900 text-white flex items-center justify-center hover:bg-red-600 transition-all shadow-lg group active:scale-95"
+            title="Configurar Sincro"
           >
-            <i className="fas fa-cog text-sm md:text-xl group-hover:rotate-90 transition-transform"></i>
+            <i className="fas fa-cog group-hover:rotate-90 transition-transform"></i>
           </button>
         </div>
         
-        {/* TÍTULO PRINCIPAL REDIMENSIONADO PARA MÓVIL */}
-        <div className="pb-6 md:pb-24 text-center w-full overflow-hidden flex flex-col items-center">
-          {/* 
-            - Ajustado a text-[10vw] para que 8 letras quepan cómodamente (8x10 = 80% del ancho)
-            - sm:text-[12vw] para tablets
-            - md:text-[8rem] y superiores para pantallas grandes
-          */}
-          <h1 className="text-[10vw] sm:text-[12vw] md:text-[9rem] lg:text-[12rem] font-black text-red-600 tracking-tighter leading-none italic drop-shadow-[0_5px_5px_rgba(220,38,38,0.2)] md:drop-shadow-[0_25px_25px_rgba(220,38,38,0.2)] select-none transform -skew-x-6 whitespace-nowrap inline-block px-4">
+        {/* Título Principal */}
+        <div className="pb-14 md:pb-20 text-center w-full max-w-full px-2 overflow-hidden">
+          <h1 
+            style={{ fontSize: 'clamp(2.2rem, 11vw, 12rem)' }}
+            className="font-black text-red-600 tracking-tighter leading-none italic drop-shadow-[0_4px_4px_rgba(220,38,38,0.15)] select-none transform -skew-x-6 whitespace-nowrap inline-block px-2"
+          >
             COMMAGRA
           </h1>
           
-          <div className="flex flex-col items-center mt-2 md:mt-12">
-            <div className="h-1 md:h-2 w-20 md:w-48 bg-gray-950 mb-3 md:mb-6 rounded-full"></div>
-            <p className="text-gray-950 font-black tracking-[0.1em] md:tracking-[0.5em] uppercase text-[7px] sm:text-xs md:text-3xl italic px-4 text-center">
+          <div className="flex flex-col items-center mt-2 md:mt-6">
+            <div className="h-1 w-12 md:w-32 bg-gray-900 mb-3 rounded-full"></div>
+            <p className="text-gray-900 font-black tracking-[0.1em] md:tracking-[0.4em] uppercase text-[7px] sm:text-[10px] md:text-2xl italic leading-none">
               Taller de Elaboración de Mármoles
             </p>
             
-            <div className="flex items-center gap-4 mt-4 md:mt-10 print:hidden">
-              <span className={`px-3 md:px-5 py-1 md:py-2 rounded-full text-[7px] md:text-[10px] font-black border-2 transition-all shadow-md flex items-center gap-2 ${settings.googleSheetEnabled ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 bg-gray-50 text-gray-400'}`}>
-                <div className={`w-1 h-1 md:w-2 md:h-2 rounded-full ${settings.googleSheetEnabled ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
-                {settings.googleSheetEnabled ? 'CONECTADO' : 'MODO LOCAL'}
+            {/* Indicador de Estado - Corregido para móviles */}
+            <div className="mt-6 print:hidden">
+              <span className={`px-4 py-1.5 rounded-full text-[9px] md:text-[10px] font-black border-2 transition-all flex items-center gap-2 ${settings.googleSheetEnabled ? 'border-green-500 bg-green-50 text-green-700 shadow-sm' : 'border-gray-200 bg-gray-50 text-gray-400'}`}>
+                <div className={`w-2 h-2 rounded-full ${settings.googleSheetEnabled ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}></div>
+                {settings.googleSheetEnabled ? 'CONEXIÓN NUBE ACTIVA' : 'MODO LOCAL'}
               </span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* MODAL DE ACCESO REMOTO */}
+      {/* Modal QR */}
       {showShareModal && (
-        <div className="fixed inset-0 bg-black/95 backdrop-blur-2xl z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="bg-white p-6 md:p-12 rounded-[2.5rem] md:rounded-[3.5rem] max-w-md w-full text-center relative shadow-2xl border border-white/20">
-            <button 
-              onClick={() => setShowShareModal(false)}
-              className="absolute -top-4 -right-4 w-12 h-12 md:w-14 md:h-14 bg-red-600 text-white rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition-transform z-20"
-            >
-              <i className="fas fa-times text-lg md:text-xl"></i>
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-xl z-[200] flex items-center justify-center p-4">
+          <div className="bg-white p-8 rounded-[2.5rem] max-w-sm w-full text-center relative shadow-2xl animate-in zoom-in duration-200">
+            <button onClick={() => setShowShareModal(false)} className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center text-gray-400 hover:text-red-600">
+              <i className="fas fa-times text-xl"></i>
             </button>
-            
-            <h3 className="text-2xl md:text-3xl font-black uppercase italic tracking-tighter mb-2 text-gray-900 leading-none">Acceso Remoto</h3>
-            <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6 md:mb-10">Uso interno taller Commagra</p>
-            
-            <div className="bg-gray-50 p-4 md:p-6 rounded-[2rem] md:rounded-[2.5rem] border-2 border-gray-100 mb-6 md:mb-8 inline-block shadow-inner">
-              <img src={qrUrl} alt="QR Code" className="w-48 h-48 md:w-64 md:h-64 mx-auto mix-blend-multiply" />
+            <h3 className="text-xl font-black uppercase italic mb-2">Acceso Taller</h3>
+            <p className="text-[10px] font-bold text-gray-400 mb-6 uppercase tracking-widest">Escanea para abrir en el móvil</p>
+            <div className="p-4 bg-gray-50 rounded-3xl border-2 border-gray-100 mb-6">
+              <img src={qrUrl} alt="QR" className="w-full aspect-square mix-blend-multiply" />
             </div>
-
-            <div className="space-y-3 md:space-y-4 mb-6 md:mb-8">
-              <button 
-                onClick={copyToClipboard}
-                className={`w-full py-4 md:py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all flex items-center justify-center gap-3 border-2 ${copied ? 'bg-green-600 border-green-600 text-white' : 'bg-gray-950 border-gray-950 text-white hover:bg-red-600 hover:border-red-600'}`}
-              >
-                <i className={`fas ${copied ? 'fa-check' : 'fa-link'}`}></i>
-                {copied ? '¡COPIADO!' : 'COPIAR ENLACE'}
-              </button>
-            </div>
-
-            <div className="bg-blue-50 p-4 md:p-6 rounded-3xl border border-blue-100 text-left">
-              <div className="flex gap-3 md:gap-4">
-                <i className="fas fa-cloud-arrow-down text-blue-600 text-lg md:text-xl mt-1"></i>
-                <div>
-                  <p className="text-[10px] md:text-[11px] font-black text-blue-900 uppercase">Instalar en el móvil:</p>
-                  <p className="text-[9px] md:text-[10px] font-bold text-blue-800 uppercase leading-tight mt-1 opacity-70">
-                    Abre el enlace y selecciona <span className="underline">"Añadir a pantalla de inicio"</span>.
-                  </p>
-                </div>
-              </div>
-            </div>
+            <button 
+              onClick={copyToClipboard}
+              className={`w-full py-4 rounded-2xl font-black text-xs tracking-widest transition-all ${copied ? 'bg-green-600 text-white' : 'bg-gray-900 text-white hover:bg-red-600'}`}
+            >
+              {copied ? '¡ENLACE COPIADO!' : 'COPIAR URL DE LA APP'}
+            </button>
           </div>
         </div>
       )}
