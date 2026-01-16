@@ -17,8 +17,14 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [filter, setFilter] = useState<TaskStatus | 'TODAS'>('TODAS');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('table');
+  const [activeTaskForWA, setActiveTaskForWA] = useState<MarbleTask | null>(null);
+  
   const [settings, setSettings] = useState<AppSettings>({
     whatsappNumber: '',
+    whatsappLabel1: 'Jefe',
+    whatsappNumber2: '',
+    whatsappLabel2: 'Oficina',
+    whatsappManualEnabled: true,
     notificationsEnabled: true,
     sendToGroup: false,
     googleSheetEnabled: false,
@@ -42,19 +48,42 @@ const App: React.FC = () => {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(newSettings));
   };
 
-  const sendWhatsAppMessage = (task: MarbleTask, newStatus: TaskStatus) => {
-    if (!settings.notificationsEnabled) return;
+  const executeWhatsAppSend = (task: MarbleTask, phone?: string) => {
     const message = `*COMMAGRA - REPORTE TALLER* ⚒️%0A%0A` +
-      `*Estado:* ${newStatus.toUpperCase()} 🚨%0A` +
+      `*Estado:* ${task.status.toUpperCase()} 🚨%0A` +
       `*Cliente:* ${task.clientName}%0A` +
       `*Material:* ${task.material} (${task.color})%0A` +
       `*Montadores:* ${task.montador}%0A` +
       `*Entrega:* ${task.deliveryDate}%0A` +
       `*Pedido:* ${task.pedido || 'S/N'}%0A%0A` +
       `_Mensaje enviado desde la App Interna Commagra_`;
-    const phone = settings.whatsappNumber.replace(/\D/g, '');
-    const url = `https://wa.me/${phone}?text=${message}`;
+    
+    let url = '';
+    if (phone) {
+      const cleanPhone = phone.replace(/\D/g, '');
+      url = `https://wa.me/${cleanPhone}?text=${message}`;
+    } else {
+      // Link universal para elegir contacto o grupo manualmente
+      url = `https://api.whatsapp.com/send?text=${message}`;
+    }
     window.open(url, '_blank');
+    setActiveTaskForWA(null);
+  };
+
+  const handleWhatsAppRequest = (task: MarbleTask) => {
+    const hasNum1 = !!settings.whatsappNumber;
+    const hasNum2 = !!settings.whatsappNumber2;
+    const hasManual = settings.whatsappManualEnabled;
+
+    // Si solo hay una opción configurada, enviar directo
+    if (hasNum1 && !hasNum2 && !hasManual) {
+      executeWhatsAppSend(task, settings.whatsappNumber);
+    } else if (!hasNum1 && !hasNum2 && hasManual) {
+      executeWhatsAppSend(task);
+    } else {
+      // Mostrar modal de elección
+      setActiveTaskForWA(task);
+    }
   };
 
   const pullFromCloud = async () => {
@@ -62,49 +91,23 @@ const App: React.FC = () => {
       alert("Configura la URL de Google Sheets primero.");
       return;
     }
-
     setIsSyncing(true);
     try {
       const url = `${settings.googleSheetWebhookUrl}?action=read`;
       const response = await fetch(url);
-      
-      if (!response.ok) throw new Error("Error en la conexión con Google");
-      
+      if (!response.ok) throw new Error("Error");
       const cloudTasks = await response.json();
-      
       if (Array.isArray(cloudTasks)) {
-        if (cloudTasks.length === 0) {
-          alert("El Excel está vacío.");
-          setIsSyncing(false);
-          return;
-        }
-
         const mappedTasks: MarbleTask[] = cloudTasks.map((t: any) => ({
+          ...t,
           id: String(t.id),
-          montador: String(t.montador),
-          clientName: String(t.clientName),
-          material: String(t.material),
-          color: String(t.color || ''),
-          status: (t.status) as TaskStatus,
-          description: String(t.description),
-          pedido: String(t.pedido || ''),
-          fecha: String(t.fecha),
-          deliveryDate: String(t.deliveryDate || ''),
-          hora: String(t.hora || ''),
-          fileName: String(t.fileName || ''),
-          fileData: String(t.fileData || ''),
-          dxfFileName: String(t.dxfFileName || ''),
-          dxfFileData: String(t.dxfFileData || ''),
           syncedToSheet: true,
           createdAt: Number(t.createdAt || Date.now())
         }));
-        
         setTasks(mappedTasks);
-        alert(`Sincronización completa: ${mappedTasks.length} trabajos cargados.`);
       }
     } catch (error) {
-      console.error(error);
-      alert("Error al cargar datos de la nube.");
+      alert("Error al sincronizar.");
     } finally {
       setIsSyncing(false);
     }
@@ -114,143 +117,129 @@ const App: React.FC = () => {
     if (!settings.googleSheetEnabled && action !== 'test') return false;
     const url = (action === 'test' && (task as any).url) ? (task as any).url : settings.googleSheetWebhookUrl;
     if (!url || !url.includes('/exec')) return false;
-
-    const payload = {
-      action,
-      id: task.id,
-      montadores: task.montador,
-      cliente: task.clientName,
-      material: task.material,
-      estado: task.status,
-      descripcion: task.description,
-      fecha: task.fecha,
-      fechaEntrega: task.deliveryDate,
-      pedido: task.pedido,
-      color: task.color,
-      archivoPDF: task.fileData || '',
-      archivoDXF: task.dxfFileData || '',
-      createdAt: task.createdAt
-    };
-
+    const payload = { action, id: task.id, material: task.material, estado: task.status, cliente: task.clientName, fechaEntrega: task.deliveryDate, pedido: task.pedido, montadores: task.montador };
     try {
-      await fetch(url, {
-        method: 'POST',
-        mode: 'no-cors',
-        cache: 'no-cache',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(payload),
-      });
-      if (action !== 'test') {
-        setTasks(prev => prev.map(t => t.id === task.id ? { ...t, syncedToSheet: true } : t));
-      }
+      await fetch(url, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
       return true;
-    } catch (error) {
-      return false;
-    }
+    } catch (e) { return false; }
   };
 
   const addTask = (taskData: Omit<MarbleTask, 'id' | 'createdAt'>) => {
-    const newTask: MarbleTask = {
-      ...taskData,
-      id: Math.random().toString(36).substr(2, 6).toUpperCase(),
-      createdAt: Date.now(),
-      syncedToSheet: false,
-    };
+    const newTask: MarbleTask = { ...taskData, id: Math.random().toString(36).substr(2, 6).toUpperCase(), createdAt: Date.now(), syncedToSheet: false };
     setTasks(prev => [newTask, ...prev]);
     setIsFormOpen(false);
     setTimeout(() => syncToGoogleSheet(newTask, 'add'), 500);
   };
 
   const updateTaskStatus = (id: string, newStatus: TaskStatus) => {
-    setTasks(prev => {
-      const updated = prev.map(t => {
-        if (t.id === id) {
-          const updatedTask = { ...t, status: newStatus, syncedToSheet: false };
-          syncToGoogleSheet(updatedTask, 'update');
-          if (confirm(`¿Notificar cambio a WhatsApp?`)) {
-            sendWhatsAppMessage(updatedTask, newStatus);
-          }
-          return updatedTask;
-        }
-        return t;
-      });
-      return updated;
-    });
+    setTasks(prev => prev.map(t => {
+      if (t.id === id) {
+        const updated = { ...t, status: newStatus, syncedToSheet: false };
+        syncToGoogleSheet(updated, 'update');
+        return updated;
+      }
+      return t;
+    }));
   };
 
   const deleteTask = (id: string) => {
-    if (window.confirm('¿Eliminar este trabajo?')) {
-      setTasks(prev => prev.filter(t => t.id !== id));
-    }
+    if (window.confirm('¿Archivar faena?')) updateTaskStatus(id, TaskStatus.ARCHIVADO);
   };
+
+  const visibleTasks = tasks.filter(t => t.status !== TaskStatus.ARCHIVADO);
+  const filteredTasks = filter === 'TODAS' ? visibleTasks : visibleTasks.filter(t => t.status === filter);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       <Header onOpenSettings={() => setIsSettingsOpen(true)} settings={settings} />
       
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-6 md:-mt-10 relative z-20">
-        <DashboardStats tasks={tasks} />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10 relative z-20">
+        <DashboardStats tasks={visibleTasks} />
 
         <div className="flex flex-col md:flex-row justify-between items-center mb-6 space-y-4 md:space-y-0 bg-white p-4 rounded-[2rem] shadow-xl border border-gray-100">
-          <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
+          <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
             <div className="flex bg-gray-100 p-1 rounded-2xl">
-              {(['TODAS', ...Object.values(TaskStatus)] as const).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setFilter(s)}
-                  className={`px-4 py-2 rounded-xl text-[9px] font-black transition-all whitespace-nowrap uppercase tracking-widest ${
-                    filter === s ? 'bg-white text-red-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'
-                  }`}
-                >
+              {(['TODAS', TaskStatus.PENDIENTE, TaskStatus.EN_CORTE, TaskStatus.ACABADO, TaskStatus.URGENTE] as const).map((s) => (
+                <button key={s} onClick={() => setFilter(s)} className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${filter === s ? 'bg-white text-red-600 shadow-sm' : 'text-gray-400'}`}>
                   {s}
                 </button>
               ))}
             </div>
           </div>
-
           <div className="flex gap-3 w-full md:w-auto">
-             <button
-              onClick={pullFromCloud}
-              disabled={isSyncing}
-              className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center transition-all shadow-lg ${isSyncing ? 'bg-gray-100 text-gray-400' : 'bg-green-600 text-white hover:bg-black active:scale-95'}`}
-              title="Sincronizar de la Nube"
-            >
-              <i className={`fas fa-sync-alt ${isSyncing ? 'fa-spin' : ''}`}></i>
-            </button>
-             <button
-              onClick={() => setViewMode(viewMode === 'table' ? 'cards' : 'table')}
-              className="bg-gray-200 text-gray-600 w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center hover:bg-gray-300 transition-all shadow-sm"
-            >
-              <i className={`fas ${viewMode === 'table' ? 'fa-th-large' : 'fa-list'}`}></i>
-            </button>
-            <button
-              onClick={() => setIsFormOpen(true)}
-              className="flex-1 md:flex-none flex items-center gap-3 bg-red-600 text-white px-8 py-4 rounded-2xl font-black hover:bg-black transition-all shadow-xl active:scale-95 justify-center uppercase italic text-xs md:text-sm tracking-tighter"
-            >
-              <i className="fas fa-plus"></i>
-              NUEVO TRABAJO
-            </button>
+            <button onClick={pullFromCloud} disabled={isSyncing} className="w-12 h-12 rounded-2xl bg-green-600 text-white flex items-center justify-center shadow-lg"><i className={`fas fa-sync-alt ${isSyncing ? 'fa-spin' : ''}`}></i></button>
+            <button onClick={() => setViewMode(viewMode === 'table' ? 'cards' : 'table')} className="bg-gray-200 text-gray-600 w-12 h-12 rounded-2xl flex items-center justify-center"><i className={`fas ${viewMode === 'table' ? 'fa-th-large' : 'fa-list'}`}></i></button>
+            <button onClick={() => setIsFormOpen(true)} className="flex-1 md:flex-none bg-red-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs">NUEVO TRABAJO</button>
           </div>
         </div>
 
-        <TaskList 
-          tasks={filter === 'TODAS' ? tasks : tasks.filter(t => t.status === filter)} 
-          onUpdateStatus={updateTaskStatus}
-          onDelete={deleteTask}
-          viewMode={viewMode}
-          onSendWhatsApp={(task) => sendWhatsAppMessage(task, task.status)}
-        />
+        <TaskList tasks={filteredTasks} onUpdateStatus={updateTaskStatus} onDelete={deleteTask} viewMode={viewMode} onSendWhatsApp={handleWhatsAppRequest} />
       </main>
 
-      {isFormOpen && <TaskForm onClose={() => setIsFormOpen(false)} onSubmit={addTask} />}
-      {isSettingsOpen && (
-        <SettingsModal 
-          settings={settings}
-          onClose={() => setIsSettingsOpen(false)}
-          onSave={updateSettings}
-          onTestConnection={(url) => syncToGoogleSheet({url} as any, 'test')}
-        />
+      {/* MODAL DE SELECCIÓN DE WHATSAPP */}
+      {activeTaskForWA && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-end sm:items-center justify-center p-4">
+          <div className="bg-white w-full max-w-sm rounded-[2rem] overflow-hidden animate-in slide-in-from-bottom duration-300 shadow-2xl">
+            <div className="p-6 text-center border-b border-gray-100">
+              <h3 className="font-black uppercase italic text-gray-900">¿Dónde enviar reporte?</h3>
+              <p className="text-[10px] font-bold text-gray-400 uppercase mt-1">{activeTaskForWA.clientName}</p>
+            </div>
+            <div className="p-4 space-y-2">
+              {settings.whatsappNumber && (
+                <button 
+                  onClick={() => executeWhatsAppSend(activeTaskForWA, settings.whatsappNumber)}
+                  className="w-full p-4 bg-gray-50 hover:bg-green-50 rounded-2xl flex items-center gap-4 transition-colors group"
+                >
+                  <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center group-hover:bg-green-600 group-hover:text-white transition-all">
+                    <i className="fas fa-user"></i>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-[10px] font-black uppercase text-gray-400 leading-none">Enviar a</p>
+                    <p className="font-black text-gray-900 uppercase">{settings.whatsappLabel1 || 'Contacto 1'}</p>
+                  </div>
+                </button>
+              )}
+              {settings.whatsappNumber2 && (
+                <button 
+                  onClick={() => executeWhatsAppSend(activeTaskForWA, settings.whatsappNumber2)}
+                  className="w-full p-4 bg-gray-50 hover:bg-green-50 rounded-2xl flex items-center gap-4 transition-colors group"
+                >
+                  <div className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center group-hover:bg-green-600 group-hover:text-white transition-all">
+                    <i className="fas fa-user-friends"></i>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-[10px] font-black uppercase text-gray-400 leading-none">Enviar a</p>
+                    <p className="font-black text-gray-900 uppercase">{settings.whatsappLabel2 || 'Contacto 2'}</p>
+                  </div>
+                </button>
+              )}
+              {settings.whatsappManualEnabled && (
+                <button 
+                  onClick={() => executeWhatsAppSend(activeTaskForWA)}
+                  className="w-full p-4 bg-gray-900 text-white rounded-2xl flex items-center gap-4 hover:bg-black transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center">
+                    <i className="fas fa-share-alt"></i>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-[10px] font-black uppercase text-gray-400 leading-none">Elegir de mi agenda</p>
+                    <p className="font-black uppercase">Grupo o Contacto</p>
+                  </div>
+                </button>
+              )}
+              <button 
+                onClick={() => setActiveTaskForWA(null)}
+                className="w-full py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
+
+      {isFormOpen && <TaskForm onClose={() => setIsFormOpen(false)} onSubmit={addTask} />}
+      {isSettingsOpen && <SettingsModal settings={settings} onClose={() => setIsSettingsOpen(false)} onSave={updateSettings} onTestConnection={(url) => syncToGoogleSheet({url} as any, 'test')} />}
     </div>
   );
 };
